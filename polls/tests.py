@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.utils import timezone
 from django.urls import reverse
 
-from .models import Question
+from .models import Question, Choice
 
 
 class QuestionModelTests(TestCase):
@@ -46,6 +46,8 @@ def create_question(question_text, days):
     time = timezone.now() + datetime.timedelta(days=days)
     return Question.objects.create(question_text=question_text, pub_date=time)
 
+def create_choice(question_id, choice_text, votes):
+    return Choice.objects.create(question=question_id, choice_text=choice_text, votes=votes)
 
 
 class QuestionIndexViewTests(TestCase):
@@ -129,4 +131,31 @@ class QuestionDetailViewTests(TestCase):
         response = self.client.get(url)
         self.assertContains(response, past_question.question_text)
 
-# TODO: ResultsView
+class QuestionResultsViewTests(TestCase):
+    # Созданный вопрос, будущее
+    def test_future_question(self):
+        future_question = create_question(question_text="Future question.", days=5)
+        url = reverse("polls:results", args=(future_question.id,))
+        response = self.client.get(url)
+        self.assertContains(response, future_question.question_text)
+
+    # Созданный вопрос, прошлое
+    def test_past_question(self):
+        past_question = create_question(question_text="Future question.", days=5)
+        url = reverse("polls:results", args=(past_question.id,))
+        response = self.client.get(url)
+        self.assertContains(response, past_question.question_text)
+    
+    # Не созданный вопрос
+    def non_existent_question(self):
+        url = reverse("polls:results", args=(99,))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    # Вопрос с ответом
+    def question_with_answers(self):
+        question = create_question(question_text="Need answers.", days=1)
+        choice = create_choice(question_id=question.id, choice_text="Yes.", votes=2)
+        url = reverse("polls:results", args=(question.id,))
+        response = self.client.get(url)
+        self.assertContains(response, choice.choice_text)
